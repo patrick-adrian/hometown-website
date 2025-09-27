@@ -58,7 +58,11 @@ export default function App() {
   };
 
   return (
+    
     <div className="App">
+      <div className="headline">
+       <span>UPCOMING EVENTS: OCT 19 BALL INSPECTION</span>
+      </div>
       <h1>Hometown Scheduler</h1>
 
       <Calendar
@@ -74,11 +78,13 @@ export default function App() {
       <button onClick={undoSelection}>Undo Selection</button>
 
       <div className="form">
+        <br></br>
         <select value={user} onChange={e => setUser(e.target.value)}>
           {Object.keys(USERS).map(u => (
             <option key={u} value={u}>{u}</option>
           ))}
         </select>
+        <br></br>
         <label>
           <input type="checkbox" checked={allDay} onChange={e => setAllDay(e.target.checked)} /> All Day
         </label>
