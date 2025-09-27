@@ -1,165 +1,131 @@
-import React, { useState } from "react";
-import Calendar from "react-calendar";
-import "react-calendar/dist/Calendar.css";
+import React, { useState, useEffect } from "react";
+import { ref, set, onValue, push } from "firebase/database";
+import { db } from "./firebase";
 import "./App.css";
 
 const USERS = {
-  Patty: "#007bff",
-  RJ: "#000000",
-  Begino: "#ff8c00"
+  Patty: "blue",
+  RJ: "black",
+  Begino: "orange"
 };
 
 export default function App() {
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDates, setSelectedDates] = useState([]);
-  const [availabilities, setAvailabilities] = useState({});
-  const [formData, setFormData] = useState({
-    user: "Patty",
-    allDay: true,
-    startTime: "",
-    endTime: ""
-  });
+  const [availabilities, setAvailabilities] = useState([]);
+  const [user, setUser] = useState("Patty");
+  const [allDay, setAllDay] = useState(true);
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
 
-  // toggle date selection (multi-select + undo)
-  const handleDateClick = (date) => {
-    const key = date.toDateString();
-    setSelectedDates((prev) =>
-      prev.find((d) => d.toDateString() === key)
-        ? prev.filter((d) => d.toDateString() !== key) // deselect
-        : [...prev, date] // select
-    );
-  };
+  const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+  const lastDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
 
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value
-    }));
-  };
+  const daysInMonth = [];
+  for (let i = 1; i <= lastDayOfMonth.getDate(); i++) {
+    daysInMonth.push(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), i));
+  }
 
-  const handleSubmit = () => {
-    if (selectedDates.length === 0) return;
-    const newAvailabilities = { ...availabilities };
+  const monthKey = `${currentMonth.getFullYear()}-${currentMonth.getMonth()}`;
 
-    selectedDates.forEach((date) => {
-      const key = date.toDateString();
-      const newEntry = {
-        ...formData,
-        name: formData.user,
-        color: USERS[formData.user],
-        date: key,
-        id: Date.now() + Math.random()
-      };
-      newAvailabilities[key] = [...(newAvailabilities[key] || []), newEntry];
+  useEffect(() => {
+    const dbRef = ref(db, "availabilities");
+    onValue(dbRef, (snapshot) => {
+      const data = snapshot.val() || {};
+      const list = [];
+      Object.keys(data).forEach((key) => {
+        list.push(data[key]);
+      });
+      setAvailabilities(list);
     });
+  }, []);
 
-    setAvailabilities(newAvailabilities);
-
-    // reset form except user
-    setFormData((prev) => ({
-      ...prev,
-      allDay: true,
-      startTime: "",
-      endTime: ""
-    }));
-    setSelectedDates([]); // clear selection after submit
-  };
-
-  const selectedEntries =
-    selectedDates.length > 0
-      ? availabilities[selectedDates[0].toDateString()] || []
-      : [];
-
-  // Highlight selected days in calendar
-  const tileClassName = ({ date, view }) => {
-    if (view === "month") {
-      return selectedDates.find((d) => d.toDateString() === date.toDateString())
-        ? "selected-day"
-        : null;
+  const toggleDate = (date) => {
+    const key = date.toDateString();
+    if (selectedDates.includes(key)) {
+      setSelectedDates(selectedDates.filter(d => d !== key));
+    } else {
+      setSelectedDates([...selectedDates, key]);
     }
   };
 
+  const undoSelection = () => {
+    setSelectedDates([]);
+  };
+
+  const submitAvailability = () => {
+    selectedDates.forEach(dateStr => {
+      const newRef = push(ref(db, "availabilities"));
+      set(newRef, {
+        user,
+        color: USERS[user],
+        date: dateStr,
+        allDay,
+        startTime: allDay ? "" : startTime,
+        endTime: allDay ? "" : endTime
+      });
+    });
+    setSelectedDates([]);
+  };
+
+  const availabilitiesByDate = (date) => {
+    return availabilities.filter(a => a.date === date.toDateString());
+  };
+
   return (
-    <div className="container">
-      <h2>📅 Group Outing Scheduler (Multi-day with Undo)</h2>
-
-      <Calendar
-        onClickDay={handleDateClick} // handle single clicks
-        tileClassName={tileClassName}
-      />
-      <p>
-        Selected:{" "}
-        {selectedDates.map((d) => d.toDateString()).join(", ") || "None"}
-      </p>
-
+    <div className="App">
+      <h1>Hometown Scheduler</h1>
+      <div className="calendar-nav">
+        <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}>◀</button>
+        <h2>{currentMonth.toLocaleString("default", { month: "long", year: "numeric" })}</h2>
+        <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}>▶</button>
+      </div>
+      <div className="calendar-grid">
+        {daysInMonth.map(date => {
+          const key = date.toDateString();
+          const isSelected = selectedDates.includes(key);
+          return (
+            <div
+              key={key}
+              className={`day ${isSelected ? "selected" : ""}`}
+              onClick={() => toggleDate(date)}
+            >
+              {date.getDate()}
+            </div>
+          );
+        })}
+      </div>
+      <button onClick={undoSelection}>Undo Selection</button>
       <div className="form">
+        <select value={user} onChange={e => setUser(e.target.value)}>
+          {Object.keys(USERS).map(u => (
+            <option key={u} value={u}>{u}</option>
+          ))}
+        </select>
         <label>
-          Name:
-          <select name="user" value={formData.user} onChange={handleChange}>
-            {Object.keys(USERS).map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
+          <input type="checkbox" checked={allDay} onChange={e => setAllDay(e.target.checked)} /> All Day
         </label>
-
-        <label>
-          <input
-            type="checkbox"
-            name="allDay"
-            checked={formData.allDay}
-            onChange={handleChange}
-          />
-          All Day
-        </label>
-
-        {!formData.allDay && (
+        {!allDay && (
           <>
-            <input
-              type="time"
-              name="startTime"
-              value={formData.startTime}
-              onChange={handleChange}
-            />
-            <span>to</span>
-            <input
-              type="time"
-              name="endTime"
-              value={formData.endTime}
-              onChange={handleChange}
-            />
+            <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
+            <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} />
           </>
         )}
-
-        <button onClick={handleSubmit}>Submit Availability</button>
+        <button onClick={submitAvailability}>Submit Availability</button>
       </div>
-
-      <div className="list">
-        <h3>
-          Availabilities on{" "}
-          {selectedDates.length > 0
-            ? selectedDates[0].toDateString()
-            : "None"}
-        </h3>
-        {selectedEntries.length === 0 ? (
-          <p>No availabilities yet.</p>
-        ) : (
+      <h3>Availabilities for selected dates:</h3>
+      {selectedDates.map(dateStr => (
+        <div key={dateStr}>
+          <strong>{dateStr}</strong>
           <ul>
-            {selectedEntries.map((entry) => (
-              <li
-                key={entry.id}
-                style={{ borderLeft: `5px solid ${entry.color}` }}
-              >
-                <strong>{entry.name}</strong> —{" "}
-                {entry.allDay
-                  ? "All Day"
-                  : `${entry.startTime} to ${entry.endTime}`}
+            {availabilitiesByDate(new Date(dateStr)).map((a, i) => (
+              <li key={i} style={{ color: a.color }}>
+                {a.user}: {a.allDay ? "All Day" : `${a.startTime} - ${a.endTime}`}
               </li>
             ))}
           </ul>
-        )}
-      </div>
+        </div>
+      ))}
     </div>
   );
 }
