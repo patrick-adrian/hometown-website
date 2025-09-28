@@ -19,6 +19,7 @@ export default function App() {
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
 
+  // Firebase: load availabilities
   useEffect(() => {
     const dbRef = ref(db, "availabilities");
     onValue(dbRef, (snapshot) => {
@@ -27,17 +28,38 @@ export default function App() {
     });
   }, []);
 
-  const toggleDate = (date) => {
+  // --- RANGE SELECTION LOGIC ---
+  const handleDateClick = (date) => {
     const key = date.toDateString();
-    if (selectedDates.find(d => d.toDateString() === key)) {
-      setSelectedDates(selectedDates.filter(d => d.toDateString() !== key));
+
+    if (selectedDates.length === 0) {
+      // First click
+      setSelectedDates([date]);
+    } else if (selectedDates.length === 1) {
+      const firstDate = selectedDates[0];
+      if (date < firstDate) {
+        // Clicked earlier → becomes new first date
+        setSelectedDates([date]);
+      } else {
+        // Select range
+        const range = [];
+        let current = new Date(firstDate);
+        while (current <= date) {
+          range.push(new Date(current));
+          current.setDate(current.getDate() + 1);
+        }
+        setSelectedDates(range);
+      }
     } else {
-      setSelectedDates([...selectedDates, date]);
+      // Already had a range → reset to this new first date
+      setSelectedDates([date]);
     }
   };
 
+  // Undo selection
   const undoSelection = () => setSelectedDates([]);
 
+  // Submit availability to Firebase
   const submitAvailability = () => {
     selectedDates.forEach(date => {
       const newRef = push(ref(db, "availabilities"));
@@ -53,38 +75,40 @@ export default function App() {
     setSelectedDates([]);
   };
 
+  // Filter availabilities by date
   const availabilitiesByDate = (date) => {
     return availabilities.filter(a => a.date === date.toDateString());
   };
 
   return (
-    
     <div className="App">
       <div className="headline">
-       <span>UPCOMING EVENTS: OCT 19 BALL INSPECTION</span>
+       <span>OCT 19 BALL INSPECTION</span>
       </div>
       <h1>Hometown Scheduler</h1>
 
-      <Calendar
-        value={selectedDates}
-        onClickDay={toggleDate}
-        tileClassName={({ date, view }) =>
-          selectedDates.find(d => d.toDateString() === date.toDateString())
-            ? "selected"
-            : null
-        }
-      />
+<Calendar
+  value={selectedDates}
+  onClickDay={handleDateClick}
+  tileClassName={({ date, view }) =>
+    selectedDates.some(d => d.toDateString() === date.toDateString())
+      ? "selected"
+      : null
+  }
+/>
+
+
 
       <button onClick={undoSelection}>Undo Selection</button>
 
       <div className="form">
-        <br></br>
+        <br />
         <select value={user} onChange={e => setUser(e.target.value)}>
           {Object.keys(USERS).map(u => (
             <option key={u} value={u}>{u}</option>
           ))}
         </select>
-        <br></br>
+        <br />
         <label>
           <input type="checkbox" checked={allDay} onChange={e => setAllDay(e.target.checked)} /> All Day
         </label>
@@ -97,19 +121,25 @@ export default function App() {
         <button onClick={submitAvailability}>Submit Availability</button>
       </div>
 
-      <h3>Availabilities for selected dates:</h3>
-      {selectedDates.map(date => (
-        <div key={date.toDateString()}>
-          <strong>{date.toDateString()}</strong>
-          <ul>
-            {availabilitiesByDate(date).map((a, i) => (
-              <li key={i} style={{ color: a.color }}>
-                {a.user}: {a.allDay ? "All Day" : `${a.startTime} - ${a.endTime}`}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
+<h3>Availabilities for selected dates:</h3>
+<div className="availabilities-container">
+  {selectedDates
+    .filter(date => availabilitiesByDate(date).length > 0) // only show dates with availabilities
+    .map(date => (
+      <div key={date.toDateString()}>
+        <strong>{date.toDateString()}</strong>
+        <ul>
+          {availabilitiesByDate(date).map((a, i) => (
+            <li key={i} style={{ color: a.color }}>
+              {a.user}: {a.allDay ? "All Day" : `${a.startTime} - ${a.endTime}`}
+            </li>
+          ))}
+        </ul>
+      </div>
+    ))}
+</div>
+
+
     </div>
   );
 }

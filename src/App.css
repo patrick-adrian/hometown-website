@@ -102,3 +102,22 @@ h1, .react-calendar, button {
     transform: translateX(-100%);
   }
 }
+
+.selected {
+  background-color: rgba(0, 123, 255, 0.5) !important; /* full tile color */
+  color: white !important; /* make the text visible */
+  border-radius: 0 !important; /* remove the circle */
+  height: 100%;
+  width: 100%;
+}
+
+.availabilities-container {
+  min-height: 250px;       /* minimum height to prevent collapsing */
+  height: 250px;           /* fixed height for scrolling */
+  overflow-y: auto;        /* scroll if content overflows */
+  border: 1px solid #ccc;
+  padding: 10px;
+  margin-top: 10px;
+  background-color: #f9f9f9;
+  border-radius: 4px;
+}
