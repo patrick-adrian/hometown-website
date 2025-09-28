@@ -95,7 +95,13 @@ export default function App() {
       ? "selected"
       : null
   }
+  minDetail="month"
+  maxDetail="month"
+  next2Label={null}   // remove ">>" (skip year forward)
+  prev2Label={null}   // remove "<<" (skip year backward)
 />
+
+
 
 
 
